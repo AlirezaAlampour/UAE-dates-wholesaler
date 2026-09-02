@@ -8,6 +8,7 @@ from typing import Any
 from anthropic import AsyncAnthropic
 
 from app import tools as demo_tools
+from app.prompts import SYSTEM_PROMPT as CUSTOMER_SYSTEM_PROMPT
 
 logger = logging.getLogger(__name__)
 
@@ -19,11 +20,7 @@ MAX_RESPONSE_TOKENS = 1024
 SYSTEM_PROMPT = [
     {
         "type": "text",
-        "text": (
-            "You are a helpful sales assistant for a dates wholesaler. "
-            "Use the provided tools when appropriate. "
-            "Never fabricate tool results. Return one concise response."
-        ),
+        "text": CUSTOMER_SYSTEM_PROMPT,
         "cache_control": {"type": "ephemeral"},
     }
 ]
