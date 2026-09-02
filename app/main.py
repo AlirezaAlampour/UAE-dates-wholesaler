@@ -24,6 +24,7 @@ app = FastAPI(title="UAE Dates Wholesaler WhatsApp Echo Demo")
 
 PROJECT_ROOT = Path(__file__).resolve().parent.parent
 INBOUND_LOG_PATH = PROJECT_ROOT / "logs" / "inbound.jsonl"
+REPLAY_HEADER = "X-WA-Replay"
 
 # Demo-only state. Losing dedupe history on restart is acceptable for this MVP.
 processed_message_ids: set[str] = set()
@@ -64,6 +65,10 @@ async def receive_webhook(request: Request) -> dict[str, str]:
 
     _append_inbound_log(payload)
 
+    replay_mode = request.headers.get(REPLAY_HEADER) == "1"
+    if replay_mode:
+        logger.info("Replay request detected; outbound WhatsApp sends are disabled")
+
     messages = list(_iter_messages(payload))
     if not messages:
         logger.info("Webhook contained no inbound messages; callback acknowledged and ignored")
@@ -71,7 +76,7 @@ async def receive_webhook(request: Request) -> dict[str, str]:
 
     logger.info("Webhook contains %d inbound message(s)", len(messages))
     for message in messages:
-        await _handle_message(message)
+        await _handle_message(message, suppress_outbound=replay_mode)
 
     return {"status": "ok"}
 
@@ -99,7 +104,11 @@ def _iter_messages(payload: dict[str, Any]):
                     yield message
 
 
-async def _handle_message(message: dict[str, Any]) -> None:
+async def _handle_message(
+    message: dict[str, Any],
+    *,
+    suppress_outbound: bool = False,
+) -> None:
     message_id = message.get("id")
     sender = message.get("from")
     message_type = message.get("type")
@@ -128,6 +137,10 @@ async def _handle_message(message: dict[str, Any]) -> None:
 
     processed_message_ids.add(message_id)
     logger.info("Echoing inbound text: id=%s from=%s", message_id, sender)
+
+    if suppress_outbound:
+        logger.info("Replay mode suppressed outbound echo: id=%s to=%s", message_id, sender)
+        return
 
     try:
         await send_text(to=sender, text=text)
