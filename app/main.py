@@ -10,6 +10,7 @@ from dotenv import load_dotenv
 from fastapi import FastAPI, HTTPException, Request
 from fastapi.responses import PlainTextResponse
 
+from app.agent import generate_reply
 from app.wa import send_text
 
 load_dotenv()
@@ -136,16 +137,21 @@ async def _handle_message(
         return
 
     processed_message_ids.add(message_id)
-    logger.info("Echoing inbound text: id=%s from=%s", message_id, sender)
-
-    if suppress_outbound:
-        logger.info("Replay mode suppressed outbound echo: id=%s to=%s", message_id, sender)
-        return
+    logger.info("Processing inbound text: id=%s from=%s", message_id, sender)
 
     try:
-        await send_text(to=sender, text=text)
+        reply = await generate_reply(contact_id=sender, customer_text=text)
+        if suppress_outbound:
+            logger.info(
+                "Replay mode suppressed outbound WhatsApp send: id=%s reply=%s",
+                message_id,
+                reply,
+            )
+            return
+
+        await send_text(to=sender, text=reply)
     except Exception:
         # Let Meta retry a transient failure instead of permanently deduping it.
         processed_message_ids.discard(message_id)
-        logger.exception("Failed to echo inbound message: id=%s", message_id)
+        logger.exception("Failed to process inbound message: id=%s", message_id)
         raise
