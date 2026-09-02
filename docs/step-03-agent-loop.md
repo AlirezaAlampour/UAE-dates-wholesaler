@@ -55,7 +55,9 @@ Passed through a running Uvicorn HTTP endpoint using the existing replay CLI and
 - Replay never invoked the mocked Meta sender.
 - A non-replay webhook invoked mocked `send_text` with the agent reply.
 
-Additional checks covered all four stub functions, the 10-turn cap, five-iteration guard, cached Anthropic request serialization, JSONL logging, webhook verification, dependency consistency, and Uvicorn startup. No real Anthropic API call was made because this workspace had no `ANTHROPIC_API_KEY`; live Claude behavior requires a configured key.
+Additional checks covered all four stub functions, the 10-turn cap, five-iteration guard, cached Anthropic request serialization, JSONL logging, webhook verification, dependency consistency, and Uvicorn startup.
+
+A live Anthropic smoke test passed with `claude-sonnet-5` through the replay HTTP path: a simple request produced final text, the Medjool request emitted `get_price_quote`, used the local `$840` result, and produced one final response, and a same-sender follow-up correctly used prior context. Replay made zero Meta sends. Anthropic returned the cache usage fields and accepted both breakpoints; creation and read counts were zero because this intentionally short Step 3 cached prefix is below the model's 1,024-token cache minimum.
 
 ## Limitations and deferred work
 
